@@ -4,7 +4,7 @@
 \alias{rwa_read}
 \title{Read WhatsApp history into R}
 \usage{
-rwa_read(x, tz = NULL, format = NULL, verbose = FALSE, ...)
+rwa_read(x, tz = NULL, format = NULL, verbose = FALSE, encoding = "UTF-8", ...)
 }
 \arguments{
 \item{x}{Path to a txt or zip file of a WhatsApp history or the history
@@ -21,14 +21,17 @@ problems you can provide a custom format here. Refer to
 \item{verbose}{A logical flag indicating whether information should be
 printed to the screen.}
 
-\item{...}{Further arguments passed to \link[stringi]{stri_read_lines}.}
+\item{encoding}{Input encoding. Should usually be "UTF-8" if files haven't
+changed since export from WhatsApp.}
+
+\item{...}{Further arguments passed to \link[base]{readLines}.}
 }
 \value{
 A tibble with the information parsed from the history file.
 }
 \description{
-Takes a history file from the ``WhatsApp'' messenger app and returns a
-formatted data.frame with descriptions of the used emojis.
+Takes a history file from the ``WhatsApp'' messenger app (txt or zip) and
+returns a formatted data.frame with descriptions of the used emojis.
 }
 \details{
 The history can be obtained going to the menu in a chat on the

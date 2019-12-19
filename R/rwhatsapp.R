@@ -1,7 +1,7 @@
 #' Read WhatsApp history into R
 #'
-#' Takes a history file from the ``WhatsApp'' messenger app and returns a
-#' formatted data.frame with descriptions of the used emojis.
+#' Takes a history file from the ``WhatsApp'' messenger app (txt or zip) and
+#' returns a formatted data.frame with descriptions of the used emojis.
 #'
 #' @details The history can be obtained going to the menu in a chat on the
 #'   ``WhatsApp'' app, choosing "more", then "Export chat".
@@ -16,7 +16,9 @@
 #'   \link[stringi]{stri_datetime_parse} for guidance.
 #' @param verbose A logical flag indicating whether information should be
 #'   printed to the screen.
-#' @param ... Further arguments passed to \link[stringi]{stri_read_lines}.
+#' @param encoding Input encoding. Should usually be "UTF-8" if files haven't
+#'   changed since export from WhatsApp.
+#' @param ... Further arguments passed to \link[base]{readLines}.
 #'
 #' @return A tibble with the information parsed from the history file.
 #' @export
@@ -31,6 +33,7 @@ rwa_read <- function(x,
                      tz = NULL,
                      format = NULL,
                      verbose = FALSE,
+                     encoding = "UTF-8",
                      ...) {
 
   if (verbose) {
@@ -40,7 +43,7 @@ rwa_read <- function(x,
     start_time <- NULL
   }
 
-  chat_raw <- rwa_read_lines(x, verbose, start_time, ...)
+  chat_raw <- rwa_read_lines(x, verbose, start_time, encoding, ...)
 
   chat_raw <- chat_raw[!chat_raw == ""]
   time <- stri_extract_first_regex(
@@ -55,7 +58,7 @@ rwa_read <- function(x,
     time <- stri_extract_first_regex(str = chat_raw,
                                      pattern = "^.*\\d+:\\d+")
   }
-  for (l in which(is.na(time))) {
+  for (l in rev(which(is.na(time)))) {
     chat_raw[l - 1] <- stri_paste(chat_raw[l - 1], chat_raw[l],
                                   sep = "\n")
   }
@@ -105,9 +108,9 @@ rwa_read <- function(x,
     source = source
   )
 
-  tbl <- dplyr::bind_cols(tbl, rwa_add_emoji(tbl))
+  tbl <- rwa_add_emoji(tbl)
 
-  if (verbose){
+  if (verbose) {
     status("emoji extracted")
     status(nrow(tbl),
            " messages from ",
@@ -126,7 +129,7 @@ rwa_read <- function(x,
 #' @inherit rwa_read
 #' @import stringi
 #' @noRd
-rwa_read_lines <- function(x, verbose, start_time = NULL, ...) {
+rwa_read_lines <- function(x, verbose, start_time = NULL, encoding, ...) {
   # get files
   zps <- grep(".zip$", x, ignore.case = TRUE)
   temp <- NULL
@@ -144,7 +147,7 @@ rwa_read_lines <- function(x, verbose, start_time = NULL, ...) {
 
   if (f_exist_s(x)) {
     if (length(x) == 1) {
-      chat_raw <- stri_read_lines(x, ...)
+      chat_raw <- readLines(x, encoding = encoding, ...)
       names(chat_raw) <- rep(x, length(chat_raw))
       if (verbose) {
         message(" one log file...")
@@ -152,7 +155,7 @@ rwa_read_lines <- function(x, verbose, start_time = NULL, ...) {
       }
     } else {
       chat_raw <- unlist(lapply(x, function(t) {
-        cr <- stri_read_lines(t)#, ...)
+        cr <- readLines(t, encoding = encoding, ...)
         names(cr) <- rep(t, length(cr))
         return(cr)
       }))
@@ -259,39 +262,41 @@ rwa_parse_time <- function(time, format, tz) {
 
 
 #' @noRd
-#' @importFrom tidytext unnest_tokens
-#' @importFrom stringi stri_replace_all_regex
-#' @importFrom dplyr left_join group_by summarise select ungroup
-#' @importFrom rlang .data
+#' @importFrom tibble tibble add_column
+#' @importFrom stringi stri_replace_all_regex stri_replace_all_charclass
+#'   stri_split_boundaries
 rwa_add_emoji <- function(x) {
-  x$id <- seq_along(x$text)
-  x$text <- stri_replace_all_regex(
-    x$text,
-    "[[:alnum:]]",
-    "x"
-  )
-  out <- tidytext::unnest_tokens_(
+
+  id <- seq_along(x[["text"]])
+  x <- add_column(x, id = id)
+  text <- x[["text"]]
+
+  text <- stri_replace_all_charclass(text, "[[:punct:][:whitespace:]]", "")
+  l <- stri_split_boundaries(text, type = "character")
+
+  out <- tibble(id = rep(id, sapply(l, length)), emoji = unlist(l))
+
+  out <- add_column(out,
+                    emoji_name = rwhatsapp::emojis$name[
+                      match(out$emoji,
+                            rwhatsapp::emojis$emoji)
+                      ])
+
+  out <- out[!is.na(out$emoji_name), ]
+
+  out <- tibble(id = unique(out$id),
+                emoji = unname(split(out$emoji, out$id)),
+                emoji_name = unname(split(out$emoji_name, out$id)))
+
+  x <- add_column(
     x,
-    output = "emoji",
-    input = "text",
-    token = "characters",
-    format = "text",
-    to_lower = FALSE,
-    drop = FALSE,
-    collapse = FALSE,
-    strip_non_alphanum = FALSE
+    emoji = out$emoji[match(x$id, out$id)],
+    emoji_name = out$emoji_name[match(x$id, out$id)]
   )
-  out <- dplyr::left_join(out, rwhatsapp::emojis, by = "emoji")
-  out$emoji[is.na(out$name)] <- NA
-  out <- dplyr::group_by(out, .data$id)
-  out <- dplyr::summarise(
-    out,
-    emoji = list(.data$emoji[!is.na(.data$emoji)]),
-    emoji_name = list(.data$name[!is.na(.data$name)])
-  )
-  out <- dplyr::ungroup(out)
-  out$emoji_count <- sapply(out$emoji, length)
-  return(dplyr::select(out, .data$emoji, .data$emoji_name))
+
+  x$id <- NULL
+
+  return(x)
 }
 
 
@@ -335,10 +340,12 @@ f_exist_s <- function(x) {
 #' A dataset containing emojis and corresponding descriptions. This is a subset
 #' of the emojis provided by the emo package.
 #'
-#' @format A tibble with 3570 rows and 2 columns:
-#' \itemize{
-#'   \item emoji: character representation of the emoji
+#' @format A tibble with 3570 rows and 3 columns: \itemize{
+#'   \item emoji character representation of the emoji
 #'   \item name of the emoji
+#'   \item hex_runes hexadecimal representations of emoji
 #' }
+#' @details \code{hex_runes} can be used to easily look up image files of
+#'   emojis.
 #' @source \url{https://github.com/hadley/emo/}
 "emojis"
