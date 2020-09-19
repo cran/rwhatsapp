@@ -55,13 +55,15 @@ rwa_read <- function(x,
                                      pattern = "[^]]+] ")
   }
   if (sum(is.na(time)) > (length(time) / 2)) {
-    time <- stri_extract_first_regex(str = chat_raw,
-                                     pattern = "^[^A-z]*\\d{1,2}:\\d{1,2}")
+    time <- stri_extract_first_regex(
+      str = chat_raw,
+        pattern = "^[^A-z]*\\d{1,2}:\\d{1,2}(\\sAM|\\sPM){0,1}"
+    )
   }
 
   proper_time <- stri_detect_regex(
     str = time,
-    pattern = "\\d{2,4}.\\d{2}.\\d{2,4}|\\d{1,2}:\\d{1,2} [APM]"
+    pattern = "\\d{1,4}.\\d{1,2}.\\d{2,4}|\\d{1,2}:\\d{1,2} [APM]"
   )
   time[!proper_time] <- NA
 
@@ -121,7 +123,9 @@ rwa_read <- function(x,
     source = source
   )
 
-  tbl <- rwa_add_emoji(tbl)
+  class(tbl) <- c("rwa_tbl", class(tbl))
+
+  tbl <- lookup_emoji(tbl)
 
   if (verbose) {
     status("emoji extracted")
@@ -305,46 +309,6 @@ rwa_parse_time <- function(time, format, tz) {
   return(time)
 }
 
-
-#' @noRd
-#' @importFrom tibble tibble add_column
-#' @importFrom stringi stri_replace_all_regex stri_replace_all_charclass
-#'   stri_split_boundaries
-rwa_add_emoji <- function(x) {
-
-  id <- seq_along(x[["text"]])
-  x <- add_column(x, id = id)
-  text <- x[["text"]]
-
-  text <- stri_replace_all_charclass(text, "[[:punct:][:whitespace:]]", "")
-  l <- stri_split_boundaries(text, type = "character")
-
-  out <- tibble(id = rep(id, sapply(l, length)), emoji = unlist(l))
-
-  out <- add_column(out,
-                    emoji_name = rwhatsapp::emojis$name[
-                      match(out$emoji,
-                            rwhatsapp::emojis$emoji)
-                      ])
-
-  out <- out[!is.na(out$emoji_name), ]
-
-  out <- tibble(id = unique(out$id),
-                emoji = unname(split(out$emoji, out$id)),
-                emoji_name = unname(split(out$emoji_name, out$id)))
-
-  x <- add_column(
-    x,
-    emoji = out$emoji[match(x$id, out$id)],
-    emoji_name = out$emoji_name[match(x$id, out$id)]
-  )
-
-  x$id <- NULL
-
-  return(x)
-}
-
-
 # creates status message and exports start_time if not in parent environment yet
 status <- function(...,
                    sep = "",
@@ -382,15 +346,15 @@ f_exist_s <- function(x) {
 
 #' List of emojis and corresponding descriptions.
 #'
-#' A dataset containing emojis and corresponding descriptions. This is a subset
-#' of the emojis provided by the emo package.
+#' A dataset containing emojis and corresponding descriptions. This dataset was
+#' collected by combining the data from the emo package with newly scraped
+#' emojis from unicode.org.
 #'
-#' @format A tibble with 3570 rows and 3 columns: \itemize{
-#'   \item emoji character representation of the emoji
-#'   \item name of the emoji
-#'   \item hex_runes hexadecimal representations of emoji
-#' }
+#' @format A tibble with 4085 rows and 3 columns: \itemize{ \item emoji
+#'   character representation of the emoji \item name of the emoji \item
+#'   hex_runes hexadecimal representations of emoji }
 #' @details \code{hex_runes} can be used to easily look up image files of
 #'   emojis.
-#' @source \url{https://github.com/hadley/emo/}
+#' @source \url{https://github.com/hadley/emo/} and
+#'   \url{https://unicode.org/emoji/charts/}
 "emojis"

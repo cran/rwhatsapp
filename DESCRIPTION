@@ -1,7 +1,7 @@
 Package: rwhatsapp
 Title: Import and Handling for 'WhatsApp' Chat Logs
-Version: 0.2.2
-Date: 2020-03-16
+Version: 0.2.3
+Date: 2020-09-18
 Authors@R: person("Johannes", "Gruber", email = "j.gruber.1@research.gla.ac.uk",
   role = c("aut", "cre"))
 Description: A straightforward, easy-to-use and robust parsing package which aims to
@@ -19,8 +19,8 @@ RoxygenNote: 7.1.0
 VignetteBuilder: knitr
 Language: en-GB
 NeedsCompilation: no
-Packaged: 2020-03-17 08:53:30 UTC; johannes
+Packaged: 2020-09-18 15:39:30 UTC; johannes
 Author: Johannes Gruber [aut, cre]
 Maintainer: Johannes Gruber <j.gruber.1@research.gla.ac.uk>
 Repository: CRAN
-Date/Publication: 2020-03-18 15:00:08 UTC
+Date/Publication: 2020-09-19 05:10:02 UTC
