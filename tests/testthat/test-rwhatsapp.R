@@ -6,6 +6,18 @@ converted <- structure(c(1499898922.226, 1499937164.226),
                        class = c("POSIXct",
                                  "POSIXt"))
 
+test_that("rwa_read structure", {
+  df <- rwa_read(x = c(
+    "12.07.2017, 10:35:22 PM - Johannes Gruber: Was it good?",
+    "13.07.2017, 09:12:44 AM - R: Yes, it was 😅"
+  ))
+  expect_s3_class(df, "tbl_df")
+  expect_equal(ncol(df), 6L)
+  expect_equal(nrow(df), 2L)
+  # test if lookup_emoji changes the class
+  expect_s3_class(lookup_emoji(subset(df, select = text)), "tbl_df")
+})
+
 test_that("time is converted correctly", {
   skip_on_cran()
   # standard
@@ -686,7 +698,7 @@ test_that("reading from file", {
     dir.create(dir)
     file.copy(system.file("extdata", "sample.txt", package = "rwhatsapp"),
               dir)
-    utils::zip(paste0(dir, "test.zip"), paste0(dir, "sample.txt"), flags = "-jr9X")
+    utils::zip(zipfile = paste0(dir, "test.zip"), paste0(dir, "sample.txt"), flags = "-jr9X")
     out <- rwa_read(x = paste0(dir, "test.zip"),
                     tz = "GMT",
                     encoding = "UTF-8",

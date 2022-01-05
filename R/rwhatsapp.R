@@ -123,8 +123,6 @@ rwa_read <- function(x,
     source = source
   )
 
-  class(tbl) <- c("rwa_tbl", class(tbl))
-
   tbl <- lookup_emoji(tbl)
 
   if (verbose) {
@@ -222,7 +220,7 @@ rwa_parse_time <- function(time, format, tz) {
 
     time <- stri_replace_all_fixed(
       time,
-      c("a.m.", "p.m."),
+      c("a.m.", "p.m.", "a. m.", "p. m."),
       c("AM", "PM"),
       vectorize_all = FALSE
     )
